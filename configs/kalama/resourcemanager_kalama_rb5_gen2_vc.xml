@@ -666,6 +666,30 @@
                 <name>PAL_STREAM_RAW</name>
             </usecase>
         </in-device>
+        <in-device>
+            <id>PAL_DEVICE_IN_AUX_DIGITAL</id>
+            <back_end_name>MI2S-LPAIF-TX-PRIMARY</back_end_name>
+            <max_channels>1</max_channels>
+            <channels>1</channels>
+            <samplerate>48000</samplerate>
+            <snd_device_name>dp-in</snd_device_name>
+            <ec_enable>0</ec_enable>
+            <usecase>
+                 <name>PAL_STREAM_RAW</name>
+            </usecase>
+        </in-device>
+        <in-device>
+            <id>PAL_DEVICE_IN_HDMI</id>
+            <back_end_name>MI2S-LPAIF-TX-PRIMARY</back_end_name>
+            <max_channels>1</max_channels>
+            <channels>1</channels>
+            <samplerate>48000</samplerate>
+            <snd_device_name>hdmi-in</snd_device_name>
+            <ec_enable>0</ec_enable>
+            <usecase>
+                 <name>PAL_STREAM_RAW</name>
+            </usecase>
+        </in-device>
         <out-device>
             <id>PAL_DEVICE_NONE</id>
             <back_end_name>CODEC_DMA-LPAIF_WSA-RX-0</back_end_name>
@@ -914,7 +938,7 @@
         </out-device>
         <out-device>
             <id>PAL_DEVICE_OUT_HDMI</id>
-            <back_end_name>MI2S-LPAIF-RX-SECONDARY</back_end_name>
+            <back_end_name>MI2S-LPAIF_RXTX-RX-PRIMARY</back_end_name>
             <max_channels>2</max_channels>
             <channels>2</channels>
             <fractional_sr>1</fractional_sr>

@@ -26,42 +26,8 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted (subject to the limitations in the
- * disclaimer below) provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *
- *   * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
- * GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
- * HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
- * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * Changes from Qualcomm Innovation Center are provided under the following license:
- *
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -939,17 +905,43 @@ int SessionAlsaCompress::connectSessionDevice(Stream* streamHandle, pal_stream_t
     deviceToConnect->getDeviceAttributes(&dAttr);
 
     if (!rxAifBackEndsToConnect.empty()) {
-        status = SessionAlsaUtils::connectSessionDevice(this, streamHandle, streamType, rm,
-            dAttr, compressDevIds, rxAifBackEndsToConnect);
         for (const auto &elem : rxAifBackEndsToConnect)
             rxAifBackEnds.push_back(elem);
+        status = SessionAlsaUtils::connectSessionDevice(this, streamHandle, streamType, rm,
+            dAttr, compressDevIds, rxAifBackEndsToConnect);
+        if (status) {
+            int cnt = 0;
+            for (const auto &elem : rxAifBackEnds) {
+                cnt++;
+                for (const auto &connectElem : rxAifBackEndsToConnect) {
+                    if (std::get<0>(elem) == std::get<0>(connectElem)) {
+                        rxAifBackEnds.erase(rxAifBackEnds.begin() + cnt - 1, rxAifBackEnds.begin() + cnt);
+                        cnt--;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     if (!txAifBackEndsToConnect.empty()) {
-        status = SessionAlsaUtils::connectSessionDevice(this, streamHandle, streamType, rm,
-            dAttr, compressDevIds, txAifBackEndsToConnect);
         for (const auto &elem : txAifBackEndsToConnect)
             txAifBackEnds.push_back(elem);
+        status = SessionAlsaUtils::connectSessionDevice(this, streamHandle, streamType, rm,
+            dAttr, compressDevIds, txAifBackEndsToConnect);
+        if (status) {
+            int cnt = 0;
+            for (const auto &elem : txAifBackEnds) {
+                cnt++;
+                for (const auto &connectElem : txAifBackEndsToConnect) {
+                    if (std::get<0>(elem) == std::get<0>(connectElem)) {
+                        txAifBackEnds.erase(txAifBackEnds.begin() + cnt - 1, txAifBackEnds.begin() + cnt);
+                        cnt--;
+                        break;
+                    }
+                }
+            }
+        }
 
     }
 
@@ -1392,7 +1384,7 @@ int SessionAlsaCompress::start(Stream * s)
                      rxAifBackEnds[0].second.data(), STREAM_SPR, &spr_miid);
             if (0 != status) {
                 PAL_ERR(LOG_TAG, "Failed to get tag info %x, status = %d", STREAM_SPR, status);
-                goto exit;;
+                goto exit;
             }
             setCustomFormatParam(audio_fmt);
             for (int i = 0; i < associatedDevices.size();i++) {
@@ -1709,6 +1701,7 @@ int SessionAlsaCompress::stop(Stream * s __unused)
         case PAL_AUDIO_OUTPUT:
             if (compress && playback_started) {
                 status = compress_stop(compress);
+                playback_started = false;
             }
             // Deregister for callback for Soft Pause
             if (isPauseRegistrationDone) {
@@ -1767,6 +1760,7 @@ int SessionAlsaCompress::close(Stream * s)
     std::string backendname;
     std::vector<std::shared_ptr<Device>> associatedDevices;
     int32_t beDevId = 0;
+    int devCount = 0;
 
     PAL_DBG(LOG_TAG, "Enter");
 
@@ -1784,7 +1778,11 @@ int SessionAlsaCompress::close(Stream * s)
                 beDevId = dev->getSndDeviceId();
                 rm->getBackendName(beDevId, backendname);
                 PAL_DBG(LOG_TAG, "backendname %s", backendname.c_str());
-                if (dev->getDeviceCount() != 0) {
+                devCount = dev->getDeviceCount();
+                // Do not clear device metadata for A2DP device if SCO device is active
+                if ((devCount == 1) && rm->isBtA2dpDevice((pal_device_id_t) beDevId))
+                    devCount += SessionAlsaUtils::getScoDevCount();
+                if (devCount > 1) {
                     PAL_DBG(LOG_TAG, "Rx dev still active\n");
                     freeDeviceMetadata.push_back(
                         std::make_pair(backendname, 0));
